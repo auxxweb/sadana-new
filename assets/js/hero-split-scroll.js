@@ -1,12 +1,19 @@
 (function () {
   "use strict";
 
-  var SCROLL_END_VH = 15;
-  /** Display progress catches up to scroll with a fixed blend + max step so fast/uneven scrolling never races the hero. */
-  var HERO_DISPLAY_LERP = 0.036;
-  var HERO_DISPLAY_MAX_DELTA = 0.0025;
-  var HOLD_WEIGHT = 11;
-  var TRANS_WEIGHT = 10;
+  /** Pin scroll distance per product transition (% of viewport, not ×100) */
+  var SCROLL_PERCENT_PER_STEP = 78;
+  /** Scroll past pin end to enter the next section (px) */
+  var HERO_EXIT_SCROLL_PX = 12;
+  /** Wheel / touch: one gesture → one product (ms between steps) */
+  var STEP_INPUT_COOLDOWN_MS = 420;
+  /** Animated transition between products */
+  var STEP_ANIM_DURATION = 0.52;
+  /** Manual scroll: display follows target quickly */
+  var HERO_DISPLAY_LERP = 0.16;
+  var HERO_DISPLAY_MAX_DELTA = 0.028;
+  var HOLD_WEIGHT = 5;
+  var TRANS_WEIGHT = 6;
   var BENEFITS_EXPAND_END = 0;
   var LEAF_TRAVEL_SPAN = 0.78;
 
@@ -157,6 +164,21 @@
       }
     }
     return stepIndex / (n - 1);
+  }
+
+  function stepIndexFromProgress(progress, n, segments) {
+    if (n <= 1) return 0;
+    var best = 0;
+    var minDist = Infinity;
+    for (var i = 0; i < n; i++) {
+      var sp = progressForStep(i, n, segments);
+      var dist = Math.abs(progress - sp);
+      if (dist < minDist) {
+        minDist = dist;
+        best = i;
+      }
+    }
+    return best;
   }
 
   function readLeafVar(el, name, fallback) {
@@ -653,110 +675,286 @@
       }
     }
 
-    var scrollEnd = "+=" + Math.round(SCROLL_END_VH * 100) + "%";
+    var scrollEnd =
+      "+=" + Math.round(Math.max(n - 1, 1) * SCROLL_PERCENT_PER_STEP) + "%";
+
+    function progressForStepNav(stepIndex) {
+      if (stepIndex >= n - 1) {
+        return holdEndForStep(n - 1);
+      }
+      return progressForStep(stepIndex, n, segments);
+    }
+
+    function isOnLastHeroStep() {
+      var st = getStepState(heroDisplayProgress, n, segments);
+      return st.mode === "hold" && st.idx === n - 1;
+    }
+
+    function exitHeroToNextSection() {
+      if (!heroST) return;
+      var y = (heroST.end || 0) + HERO_EXIT_SCROLL_PX;
+      if (typeof ScrollTrigger.scroll === "function") {
+        ScrollTrigger.scroll(y);
+      } else {
+        window.scrollTo({ top: y, behavior: "auto" });
+      }
+      setHeroProgressImmediate(holdEndForStep(n - 1));
+    }
 
     var heroDisplayProgress = 0;
     var heroTargetProgress = 0;
+    var activeStep = 0;
+    var stepAnimBusy = false;
+    var stepAnimTween = null;
+    var lastStepInputAt = 0;
+
+    function syncHeroUI(p) {
+      applyBenefitsExpand(p);
+      applyState(p);
+      applyHeroProgressUI(p);
+    }
+
+    function setHeroProgressImmediate(p) {
+      p = clamp01(p);
+      heroTargetProgress = p;
+      heroDisplayProgress = p;
+      activeStep = stepIndexFromProgress(p, n, segments);
+      syncHeroUI(p);
+    }
+
+    function scrollYForProgress(p) {
+      if (!heroST) return 0;
+      var start = heroST.start || 0;
+      var end = heroST.end || start + 1;
+      return start + clamp01(p) * (end - start);
+    }
+
+    function scrollToProgress(p, immediate) {
+      p = clamp01(p);
+      var y = scrollYForProgress(p);
+      if (typeof ScrollTrigger.scroll === "function") {
+        ScrollTrigger.scroll(y);
+      } else if (immediate) {
+        window.scrollTo(0, y);
+      } else {
+        window.scrollTo({ top: y, behavior: "smooth" });
+      }
+      heroTargetProgress = heroST ? heroST.progress : p;
+    }
+
+    function animateHeroToStep(stepIndex) {
+      if (!heroST) return;
+      stepIndex = Math.max(0, Math.min(n - 1, stepIndex));
+      if (stepAnimBusy && stepIndex === activeStep) return;
+
+      var targetP = progressForStepNav(stepIndex);
+      if (Math.abs(heroDisplayProgress - targetP) < 0.0004 && stepIndex === activeStep) {
+        return;
+      }
+
+      if (stepAnimTween) {
+        stepAnimTween.kill();
+        stepAnimTween = null;
+      }
+
+      stepAnimBusy = true;
+      activeStep = stepIndex;
+
+      var anim = { p: heroDisplayProgress };
+      stepAnimTween = gsap.to(anim, {
+        p: targetP,
+        duration: STEP_ANIM_DURATION,
+        ease: "power2.inOut",
+        overwrite: true,
+        onUpdate: function () {
+          heroDisplayProgress = anim.p;
+          heroTargetProgress = anim.p;
+          scrollToProgress(anim.p, true);
+          syncHeroUI(anim.p);
+        },
+        onComplete: function () {
+          stepAnimBusy = false;
+          stepAnimTween = null;
+          setHeroProgressImmediate(targetP);
+          scrollToProgress(targetP, true);
+        },
+      });
+    }
+
+    function scrollToStep(stepIndex) {
+      if (!heroST) {
+        setHeroProgressImmediate(progressForStepNav(stepIndex));
+        return;
+      }
+      animateHeroToStep(stepIndex);
+    }
+
+    function tryStepByDirection(dir) {
+      if (!heroST || !heroST.isActive) return false;
+      if (stepAnimBusy) return true;
+
+      var now = Date.now();
+      if (now - lastStepInputAt < STEP_INPUT_COOLDOWN_MS) return true;
+
+      if (dir > 0 && isOnLastHeroStep()) {
+        lastStepInputAt = now;
+        exitHeroToNextSection();
+        return true;
+      }
+
+      if (dir < 0 && activeStep <= 0) return false;
+
+      lastStepInputAt = now;
+      animateHeroToStep(activeStep + dir);
+      return true;
+    }
 
     function tickHeroDisplaySmooth() {
+      if (stepAnimBusy) return;
+
       var target = heroTargetProgress;
       var diff = target - heroDisplayProgress;
       var dr =
         typeof gsap.ticker.deltaRatio === "function"
           ? gsap.ticker.deltaRatio()
           : 1;
-      if (Math.abs(diff) < 0.00007) {
+
+      if (Math.abs(diff) < 0.00012) {
         if (Math.abs(heroDisplayProgress - target) > 1e-6) {
           heroDisplayProgress = target;
-          applyBenefitsExpand(heroDisplayProgress);
-          applyState(heroDisplayProgress);
-          applyHeroProgressUI(heroDisplayProgress);
+          activeStep = stepIndexFromProgress(target, n, segments);
+          syncHeroUI(heroDisplayProgress);
         }
         return;
       }
+
       var step = diff * HERO_DISPLAY_LERP * dr;
       var maxStep = HERO_DISPLAY_MAX_DELTA * dr;
       if (maxStep > 0 && Math.abs(step) > maxStep) {
         step = (diff > 0 ? 1 : -1) * maxStep;
       }
       heroDisplayProgress += step;
-      applyBenefitsExpand(heroDisplayProgress);
-      applyState(heroDisplayProgress);
-      applyHeroProgressUI(heroDisplayProgress);
+      syncHeroUI(heroDisplayProgress);
     }
 
-    var heroST = ScrollTrigger.create({
-      trigger: section,
-      start: "top top",
-      end: scrollEnd,
-      pin: true,
-      pinSpacing: true,
-      pinReparent: true,
-      scrub: false,
-      anticipatePin: 0,
-      invalidateOnRefresh: true,
-      snap:
-        snapPoints.length > 1
-          ? {
-              snapTo: function (progress) {
-                var nearest = snapPoints[0];
-                var minDist = Math.abs(progress - nearest);
-                for (var p = 1; p < snapPoints.length; p++) {
-                  var dist = Math.abs(progress - snapPoints[p]);
-                  if (dist < minDist) {
-                    minDist = dist;
-                    nearest = snapPoints[p];
-                  }
-                }
-                return nearest;
-              },
-              duration: { min: 1.1, max: 1.85 },
-              delay: 0.4,
-              ease: "power3.inOut",
-            }
-          : false,
-      onUpdate: function (self) {
-        heroTargetProgress = self.progress;
-      },
-    });
+    var heroST = null;
+    var heroPinMounted = false;
 
-    heroTargetProgress = heroST.progress || 0;
-    heroDisplayProgress = heroTargetProgress;
-    applyBenefitsExpand(heroDisplayProgress);
-    applyState(heroDisplayProgress);
-    applyHeroProgressUI(heroDisplayProgress);
+    function mountHeroScrollPin() {
+      if (heroPinMounted || prefersReduced) return;
+      heroPinMounted = true;
+
+      heroST = ScrollTrigger.create({
+        trigger: section,
+        start: "top top",
+        end: scrollEnd,
+        pin: true,
+        pinSpacing: true,
+        scrub: false,
+        anticipatePin: 0,
+        invalidateOnRefresh: true,
+        snap:
+          snapPoints.length > 1
+            ? {
+                snapTo: function (progress) {
+                  var nearest = snapPoints[0];
+                  var minDist = Math.abs(progress - nearest);
+                  for (var p = 1; p < snapPoints.length; p++) {
+                    var dist = Math.abs(progress - snapPoints[p]);
+                    if (dist < minDist) {
+                      minDist = dist;
+                      nearest = snapPoints[p];
+                    }
+                  }
+                  return nearest;
+                },
+                duration: { min: 0.32, max: 0.55 },
+                delay: 0.06,
+                ease: "power2.inOut",
+              }
+            : false,
+        onUpdate: function (self) {
+          if (stepAnimBusy) return;
+          heroTargetProgress = self.progress;
+          activeStep = stepIndexFromProgress(heroTargetProgress, n, segments);
+        },
+      });
+
+      setHeroProgressImmediate(heroST.progress || 0);
+      refreshHeroScrollTrigger();
+    }
+
+    function scheduleHeroScrollPin() {
+      requestAnimationFrame(function () {
+        requestAnimationFrame(mountHeroScrollPin);
+      });
+    }
+
+    /* Visible hero on first paint; pin after layout/images settle */
+    setHeroProgressImmediate(0);
+    section.classList.add("hero-split--ready");
     gsap.ticker.add(tickHeroDisplaySmooth);
+
+    if (document.readyState === "complete") {
+      scheduleHeroScrollPin();
+    } else {
+      window.addEventListener("load", scheduleHeroScrollPin, { once: true });
+    }
+
+    function onHeroWheel(e) {
+      if (!heroST || !heroST.isActive || prefersReduced) return;
+      if (Math.abs(e.deltaY) < 12) return;
+
+      var dir = e.deltaY > 0 ? 1 : -1;
+      if (tryStepByDirection(dir)) {
+        e.preventDefault();
+      }
+    }
+
+    section.addEventListener("wheel", onHeroWheel, { passive: false });
+
+    var touchStartY = 0;
+    var touchStartAt = 0;
+    section.addEventListener(
+      "touchstart",
+      function (e) {
+        if (!e.touches || !e.touches.length) return;
+        touchStartY = e.touches[0].clientY;
+        touchStartAt = Date.now();
+      },
+      { passive: true }
+    );
+    section.addEventListener(
+      "touchend",
+      function (e) {
+        if (!heroST || !heroST.isActive || prefersReduced) return;
+        if (!e.changedTouches || !e.changedTouches.length) return;
+        if (Date.now() - touchStartAt > 700) return;
+
+        var dy = touchStartY - e.changedTouches[0].clientY;
+        if (Math.abs(dy) < 42) return;
+
+        var dir = dy > 0 ? 1 : -1;
+        if (tryStepByDirection(dir)) {
+          e.preventDefault();
+        }
+      },
+      { passive: false }
+    );
 
     requestAnimationFrame(function () {
       refreshHeroScrollTrigger();
-      heroTargetProgress = heroST.progress || 0;
-      heroDisplayProgress = heroTargetProgress;
-      applyBenefitsExpand(heroDisplayProgress);
-      applyState(heroDisplayProgress);
-      applyHeroProgressUI(heroDisplayProgress);
+      if (!stepAnimBusy) {
+        setHeroProgressImmediate(heroST.progress || 0);
+      }
     });
     setTimeout(function () {
       refreshHeroScrollTrigger();
-      heroTargetProgress = heroST.progress || 0;
-      heroDisplayProgress = heroTargetProgress;
-      layoutHeroProgressStops();
-      applyBenefitsExpand(heroDisplayProgress);
-      applyState(heroDisplayProgress);
-      applyHeroProgressUI(heroDisplayProgress);
-    }, 150);
-
-    function scrollToStep(stepIndex) {
-      if (!heroST) return;
-      var p = progressForStep(stepIndex, n, segments);
-      var start = heroST.start || 0;
-      var end = heroST.end || start + 1;
-      var targetY = start + p * (end - start);
-      if (typeof ScrollTrigger.scroll === "function") {
-        ScrollTrigger.scroll(targetY);
-      } else {
-        window.scrollTo({ top: targetY, behavior: "smooth" });
+      if (!stepAnimBusy) {
+        setHeroProgressImmediate(heroST.progress || 0);
+        layoutHeroProgressStops();
       }
-    }
+    }, 150);
 
     stepBtns.forEach(function (btn) {
       btn.addEventListener("click", function () {
@@ -805,6 +1003,9 @@
       if (typeof ScrollTrigger !== "undefined") {
         ScrollTrigger.refresh(true);
       }
+      if (heroPinMounted && heroST && !stepAnimBusy) {
+        setHeroProgressImmediate(heroST.progress || 0);
+      }
     }
 
     if (document.fonts && document.fonts.ready) {
@@ -826,18 +1027,12 @@
     window.addEventListener(
       "load",
       function () {
-        refreshHeroScrollTrigger();
-        if (heroST) {
-          heroTargetProgress = heroST.progress || 0;
-          heroDisplayProgress = heroTargetProgress;
-          layoutHeroProgressStops();
-          applyBenefitsExpand(heroDisplayProgress);
-          applyState(heroDisplayProgress);
-          applyHeroProgressUI(heroDisplayProgress);
+        if (!heroPinMounted) {
+          scheduleHeroScrollPin();
         }
-        requestAnimationFrame(function () {
-          refreshHeroScrollTrigger();
-        });
+        layoutHeroProgressStops();
+        refreshHeroScrollTrigger();
+        requestAnimationFrame(refreshHeroScrollTrigger);
       },
       { once: true }
     );

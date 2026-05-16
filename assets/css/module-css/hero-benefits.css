@@ -1,5 +1,5 @@
 /**
- * Hero benefits scene — scroll expand, per-product callouts, dashed lines.
+ * Hero benefits scene — ambient glow behind product (callout labels removed).
  */
 
 .hero-benefits-scene {
@@ -34,10 +34,7 @@
 }
 
 .hero-benefits__sets {
-  position: absolute;
-  inset: 0;
-  z-index: 6;
-  pointer-events: none;
+  display: none !important;
 }
 
 .hero-benefits__set {

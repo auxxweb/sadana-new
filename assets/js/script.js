@@ -18,7 +18,11 @@
 	//Hide Loading Box (Preloader) - reduced delay for faster perceived load
 	function handlePreloader() {
 		if($('.loader-wrap').length){
-			$('.loader-wrap').delay(200).fadeOut(400);
+			$('.loader-wrap').delay(200).fadeOut(400, function () {
+				$('body').removeClass('loading');
+			});
+		} else {
+			$('body').removeClass('loading');
 		}
 	}
 

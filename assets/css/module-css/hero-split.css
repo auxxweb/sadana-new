@@ -20,6 +20,20 @@
   min-height: clamp(520px, 88vh, 920px);
 }
 
+/* First paint before GSAP: show slide 0 only (avoids blank / stacked flash) */
+.banner-section--split .hero-split__panel:not([data-hero-step="0"]),
+.banner-section--split .hero-split__viz-panel:not([data-hero-step="0"]) {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.banner-section--split .hero-split__panel[data-hero-step="0"],
+.banner-section--split .hero-split__viz-panel[data-hero-step="0"] {
+  opacity: 1;
+  visibility: visible;
+}
+
 .banner-section--split .auto-container {
   position: relative;
   z-index: 2;

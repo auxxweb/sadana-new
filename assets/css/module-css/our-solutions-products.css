@@ -166,13 +166,45 @@
   font-size: 0.85rem;
 }
 
-.solution-product-card__cta {
-  display: inline-block;
+.solution-product-card__actions {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin-top: 0.25rem;
 }
 
-.solution-product-card__cta.theme-btn-one {
-  font-size: 0.875rem;
-  padding: 8px 20px;
+.solution-product-card__cta-amazon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 9px 18px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: #fff;
+  text-decoration: none;
+  background: #232f3e;
+  border: 1px solid #232f3e;
+  border-radius: 999px;
+  transition: background 0.25s ease, transform 0.2s ease, border-color 0.25s ease;
+}
+
+.solution-product-card__cta-amazon .fab {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.solution-product-card__cta-amazon:hover {
+  color: #fff;
+  background: #37475a;
+  border-color: #37475a;
+  transform: translateY(-1px);
+}
+
+.solution-product-card__cta-amazon:focus-visible {
+  outline: 2px solid rgb(0, 167, 167);
+  outline-offset: 2px;
 }
 
 @media (max-width: 991px) {

@@ -8,22 +8,6 @@ html {
   scrollbar-gutter: stable;
 }
 
-/* Below-the-fold sections: browser can skip layout until near viewport */
-.service-section,
-.about-section,
-.feature-section,
-.team-section,
-.portfolio-section,
-.pricing-section,
-.faq-section,
-.testimonial-section,
-.news-section,
-.clients-section,
-.instagram-section {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 400px;
-}
-
 /* Less gap between banner and Herbal Range section */
 .banner-section + .service-section {
   padding-top: 50px;
@@ -2597,9 +2581,53 @@ body.loading .loader-gif {
   .whatsapp-float {
     width: 40px;
     height: 40px;
-    bottom: 68px;
-    right: 14px;
     font-size: 20px;
+  }
+}
+
+/**
+ * Mobile / tablet: stack exactly two FABs — AI chat (bottom) + WhatsApp (above).
+ * Matches products.html and other inner pages (no index-only oversized WhatsApp).
+ */
+@media (max-width: 991px) {
+  :root {
+    --fab-size: 44px;
+    --fab-gap: 12px;
+    --fab-edge: clamp(14px, 3.5vw, 18px);
+    --fab-safe-bottom: max(var(--fab-edge), env(safe-area-inset-bottom, 0px));
+  }
+
+  .sanadana-chatbot {
+    bottom: var(--fab-safe-bottom) !important;
+    right: var(--fab-edge) !important;
+  }
+
+  .sanadana-chatbot__trigger {
+    width: var(--fab-size);
+    height: var(--fab-size);
+  }
+
+  .whatsapp-float {
+    width: var(--fab-size) !important;
+    height: var(--fab-size) !important;
+    right: var(--fab-edge) !important;
+    bottom: calc(var(--fab-safe-bottom) + var(--fab-size) + var(--fab-gap)) !important;
+    font-size: 22px;
+  }
+
+  /* Home index: only WhatsApp + chat — no third scroll-to-top FAB */
+  body.page-home .footer-premium__scroll-top {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+}
+
+@media (max-width: 575px) {
+  :root {
+    --fab-size: 40px;
+    --fab-gap: 10px;
+    --fab-edge: 14px;
   }
 }
 
