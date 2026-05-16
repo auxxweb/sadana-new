@@ -844,12 +844,19 @@
       if (heroPinMounted || prefersReduced) return;
       heroPinMounted = true;
 
+      section.style.paddingBottom = "";
+
+      if (window.scrollY > 0 && window.scrollY < 80) {
+        window.scrollTo(0, 0);
+      }
+
       heroST = ScrollTrigger.create({
         trigger: section,
         start: "top top",
         end: scrollEnd,
         pin: true,
         pinSpacing: true,
+        pinType: "fixed",
         scrub: false,
         anticipatePin: 0,
         invalidateOnRefresh: true,
@@ -890,16 +897,11 @@
       });
     }
 
-    /* Visible hero on first paint; pin after layout/images settle */
+    /* Visible hero on first paint; pin on next frame (no pin-spacer gap) */
     setHeroProgressImmediate(0);
     section.classList.add("hero-split--ready");
     gsap.ticker.add(tickHeroDisplaySmooth);
-
-    if (document.readyState === "complete") {
-      scheduleHeroScrollPin();
-    } else {
-      window.addEventListener("load", scheduleHeroScrollPin, { once: true });
-    }
+    scheduleHeroScrollPin();
 
     function onHeroWheel(e) {
       if (!heroST || !heroST.isActive || prefersReduced) return;

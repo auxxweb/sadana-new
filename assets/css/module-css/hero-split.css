@@ -7,8 +7,61 @@
  */
 
 #hero-product-scroll.banner-section--split {
-  padding: 0;
-  margin-top: 0;
+  padding: 0 !important;
+  margin-top: 0 !important;
+}
+
+/* Legacy theme adds 140px top padding to .banner-section on small screens */
+@media only screen and (max-width: 767px) {
+  #hero-product-scroll.banner-section--split {
+    padding-top: 0 !important;
+  }
+}
+
+/* Home: header overlays hero — no extra document gap above hero */
+body.page-home .main-header {
+  top: 0;
+}
+
+body.page-home .boxed_wrapper {
+  padding-top: 0;
+}
+
+/*
+ * Pin spacer reserves scroll room so sections below do not overlap the hero.
+ * Match hero background so no white viewport band shows above/beside the pin.
+ */
+body.page-home .pin-spacer:has(#hero-product-scroll) {
+  margin: 0 !important;
+  padding: 0 !important;
+  background: #fafcfb !important;
+}
+
+body.page-home #hero-product-scroll.banner-section--split {
+  top: 0 !important;
+  z-index: 30;
+  background: #fafcfb;
+}
+
+body.page-home #hero-product-scroll.banner-section--split.pin-active {
+  z-index: 40;
+}
+
+/* Sections after hero sit below the pin track and do not paint over the hero */
+body.page-home .service-section,
+body.page-home .about-section,
+body.page-home .feature-section,
+body.page-home .team-section,
+body.page-home .portfolio-section,
+body.page-home .pricing-section,
+body.page-home .faq-section,
+body.page-home .testimonial-section,
+body.page-home .news-section,
+body.page-home .clients-section,
+body.page-home .instagram-section {
+  position: relative;
+  z-index: 1;
+  isolation: isolate;
 }
 
 .banner-section--split {

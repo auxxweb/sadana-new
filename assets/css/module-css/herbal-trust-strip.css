@@ -5,6 +5,7 @@
 .service-section--herbal-trust {
   padding-top: clamp(2rem, 4vw, 3.25rem) !important;
   padding-bottom: clamp(4.5rem, 9vw, 7.5rem) !important;
+  background: var(--premium-bg, #fafcfb);
 }
 
 .banner-section + .service-section--herbal-trust {
