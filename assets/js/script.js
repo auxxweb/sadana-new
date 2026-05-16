@@ -556,7 +556,7 @@
 			var winDow = $(window);
 			// Needed variables
 			var $container=$('.sortable-masonry .items-container');
-			var $filter=$('.filter-btns');
+			var $filter=$('.sortable-masonry .filter-btns');
 	
 			$container.isotope({
 				filter:'*',
@@ -604,7 +604,7 @@
 			});
 	
 	
-			var filterItemA	= $('.filter-btns li');
+			var filterItemA	= $('.sortable-masonry .filter-btns li');
 	
 			filterItemA.on('click', function(){
 				var $this = $(this);

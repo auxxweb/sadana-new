@@ -12,7 +12,32 @@
     ".herbal_supplements",
   ];
 
-  $(function () {
+  var amazonCtasBound = false;
+
+  function bindAmazonCtas($root) {
+    if (amazonCtasBound) {
+      return;
+    }
+    amazonCtasBound = true;
+
+    $root.on(
+      "mousedown.amazonCta touchstart.amazonCta",
+      "a.solution-product-card__cta-amazon",
+      function (e) {
+        e.stopPropagation();
+      }
+    );
+
+    $root.on("click.amazonCta", "a.solution-product-card__cta-amazon", function (e) {
+      e.stopPropagation();
+      var url = this.getAttribute("href");
+      if (!url) return;
+      window.open(url, "_blank", "noopener,noreferrer");
+      e.preventDefault();
+    });
+  }
+
+  function initOurSolutionsCarousel() {
     var $carousel = $(".our-solutions-carousel");
     var $panel = $(".our-solutions-panel");
     var $filters = $panel.find(".our-solutions-filters li");
@@ -20,6 +45,12 @@
     if (!$carousel.length || typeof $.fn.owlCarousel !== "function") {
       return;
     }
+
+    if ($carousel.hasClass("owl-loaded")) {
+      return;
+    }
+
+    bindAmazonCtas($carousel);
 
     $carousel.owlCarousel({
       loop: true,
@@ -29,12 +60,18 @@
       items: 1,
       smartSpeed: 550,
       autoplay: false,
+      mouseDrag: true,
+      touchDrag: true,
+      pullDrag: true,
+      freeDrag: false,
       responsive: {
         0: { items: 1 },
         768: { items: 1 },
         1200: { items: 1 },
       },
     });
+
+    $carousel.find(".owl-nav").remove();
 
     function setActiveFilter(index) {
       var selector = slideFilters[index];
@@ -73,5 +110,8 @@
 
       return false;
     });
-  });
+  }
+
+  $(initOurSolutionsCarousel);
+  $(window).on("load", initOurSolutionsCarousel);
 })(window.jQuery);
